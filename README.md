@@ -75,7 +75,7 @@ cd shellguard
 
     Backend: Kotlin + Spring Boot
 
-    UI: HTMX + Tailwind
+    UI: HTMX + CSS
 
     Communication: WebSockets for real-time approval updates
 

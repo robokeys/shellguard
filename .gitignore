@@ -1,0 +1,78 @@
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### Kotlin ###
+.kotlin
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+# User-specific ignores
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# Gradle ignores
+.gradle
+/build/
+.gradle/
+build/
+local.properties
+.DS_Store
+*.seed
+*.log
+*/build/
+.idea/libraries/
+gradle/wrapper/gradle-wrapper.jar
+
+# Windows specific ignores
+Thumbs.db
+Desktop.ini
+
+
+# Sensitive information (example - adjust as needed)
+# config.properties
+# *.env
+
+# Any generated code or assets that shouldn't be versioned
+# generated-src/
+# assets/generated/

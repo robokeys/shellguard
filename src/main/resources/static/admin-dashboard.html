@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robokeys ShellGuard - Admin Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #8360c3 0%, #2ebf91 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: 100vh;
+        }
+        .header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff9a9e, #fecfef);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .panel h2 {
+            margin-bottom: 20px;
+            color: #ff9a9e;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ff9a9e;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .session-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .session-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--status-color);
+        }
+        .session-item.connected { --status-color: #4ade80; }
+        .session-item.disconnected { --status-color: #f87171; }
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .session-id {
+            font-weight: bold;
+            color: #ff9a9e;
+        }
+        .session-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-connected { background: #4ade80; color: #000; }
+        .status-disconnected { background: #f87171; color: #fff; }
+        .session-details {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        .history-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-command {
+            font-family: 'Consolas', 'Monaco', monospace;
+            flex: 1;
+        }
+        .history-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-completed { background: #4ade80; color: #000; }
+        .status-failed { background: #f87171; color: #fff; }
+        .status-rejected { background: #fbbf24; color: #000; }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .btn-danger {
+            background: linear-gradient(45deg, #f87171, #ef4444);
+            color: white;
+        }
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(248, 113, 113, 0.4);
+        }
+        .loading {
+            opacity: 0.6;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="header">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 1.2rem;">
+            <img src="robo-approver.png" alt="AI Approval Robot"
+                 style="width: 92px; height: 92px; object-fit: contain;" />
+            <h1>RKCL Admin Dashboard</h1>
+        </div>
+        <p>System administration, monitoring, and control</p>
+    </div>
+
+    <!-- Engine Statistics -->
+    <div class="panel">
+        <h2>📊 Engine Statistics</h2>
+
+        <div class="stats-grid"
+             hx-get="/api/shellguard/engine/stats"
+             hx-trigger="load, every 5s"
+             hx-target="this"
+             hx-swap="innerHTML">
+            <div class="loading">Loading engine stats...</div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="workflowChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Active SSH Sessions -->
+    <div class="panel">
+        <h2>🔗 SSH Sessions</h2>
+
+        <div class="session-list"
+             hx-get="/api/rkcl/sessions"
+             hx-trigger="load, every 10s"
+             hx-target="this"
+             hx-swap="innerHTML">
+            <div class="loading">Loading SSH sessions...</div>
+        </div>
+
+        <button class="btn btn-danger" onclick="disconnectAllSessions()">
+            🚫 Disconnect All Sessions
+        </button>
+    </div>
+
+    <!-- Command History -->
+    <div class="panel">
+        <h2>📋 Recent Commands</h2>
+
+        <div style="flex: 1; overflow-y: auto;"
+             hx-get="/api/shellguard/engine/command-history-json"
+             hx-trigger="load, every 5s"
+             hx-target="this"
+             hx-swap="innerHTML">
+            <div class="loading">Loading command history...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let workflowChart = null;
+
+    // Initialize chart
+    function initChart() {
+        const ctx = document.getElementById('workflowChart').getContext('2d');
+        workflowChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completed', 'Active', 'Failed', 'Rejected'],
+                datasets: [{
+                    data: [0, 0, 0, 0],
+                    backgroundColor: [
+                        '#4ade80',
+                        '#3b82f6',
+                        '#f87171',
+                        '#fbbf24'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#ffffff',
+                            padding: 20
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update chart with new data
+    function updateChart(stats) {
+        if (workflowChart && stats) {
+            workflowChart.data.datasets[0].data = [
+                stats.completed || 0,
+                stats.active || 0,
+                stats.failed || 0,
+                stats.rejected || 0
+            ];
+            workflowChart.update();
+        }
+    }
+
+    // Disconnect all sessions
+    async function disconnectAllSessions() {
+        if (!confirm('Are you sure you want to disconnect all SSH sessions?')) {
+            return;
+        }
+
+        try {
+            // First get all sessions
+            const sessionsResponse = await fetch('/api/rkcl/sessions');
+            const sessionsData = await sessionsResponse.json();
+
+            if (sessionsData.sessions) {
+                // Disconnect each session
+                for (const session of sessionsData.sessions) {
+                    await fetch(`/api/rkcl/sessions/${session.sessionId}`, {
+                        method: 'DELETE'
+                    });
+                }
+                alert(`Disconnected ${sessionsData.sessions.length} sessions`);
+                // Refresh the sessions display
+                htmx.trigger('.session-list', 'refresh');
+            }
+        } catch (e) {
+            alert('Error disconnecting sessions: ' + e.message);
+        }
+    }
+
+    // HTMX response handlers
+    document.addEventListener('htmx:afterRequest', function(event) {
+        const target = event.target;
+
+        // Handle stats grid updates
+        if (target.classList.contains('stats-grid')) {
+            try {
+                const statsData = JSON.parse(event.detail.xhr.responseText);
+                if (statsData.stats) {
+                    updateChart(statsData.stats);
+
+                    // Update stats grid HTML
+                    target.innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-value">${statsData.stats.total}</div>
+                            <div class="stat-label">Total</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${statsData.stats.active}</div>
+                            <div class="stat-label">Active</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${statsData.stats.completed}</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${statsData.stats.failed}</div>
+                            <div class="stat-label">Failed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${statsData.stats.rejected}</div>
+                            <div class="stat-label">Rejected</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${(statsData.stats.averageDurationSeconds || (statsData.stats.averageDurationMs/1000)).toFixed(1)}s</div>
+                            <div class="stat-label">Avg Duration</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Error updating stats:', e);
+            }
+        }
+
+        // Handle sessions list updates
+        if (target.classList.contains('session-list')) {
+            try {
+                const sessionsData = JSON.parse(event.detail.xhr.responseText);
+                if (sessionsData.sessions) {
+                    target.innerHTML = sessionsData.sessions.map(session => `
+                        <div class="session-item ${session.connected ? 'connected' : 'disconnected'}">
+                            <div class="session-header">
+                                <div class="session-id">${session.sessionId}</div>
+                                <span class="session-status status-${session.connected ? 'connected' : 'disconnected'}">
+                                    ${session.connected ? 'Connected' : 'Disconnected'}
+                                </span>
+                            </div>
+                            <div class="session-details">
+                                Status: ${session.connected ? 'Active' : 'Inactive'}
+                            </div>
+                        </div>
+                    `).join('') || '<div style="text-align: center; opacity: 0.6;">No active sessions</div>';
+                }
+            } catch (e) {
+                console.error('Error updating sessions:', e);
+            }
+        }
+
+        // Handle command history updates
+        if (event.detail.xhr.getResponseHeader('Content-Type')?.includes('application/json') &&
+            target.parentElement?.querySelector('h2')?.textContent?.includes('Recent Commands')) {
+            try {
+                const historyData = JSON.parse(event.detail.xhr.responseText);
+                if (Array.isArray(historyData)) {
+                    target.innerHTML = historyData.slice(0, 10).map(item => `
+                        <div class="history-item">
+                            <div class="history-command">${item.displayCommand || item.command}</div>
+                            <span class="history-status status-${item.status.toLowerCase()}">${item.statusIcon || ''} ${item.status}</span>
+                        </div>
+                    `).join('') || '<div style="text-align: center; opacity: 0.6;">No command history</div>';
+                }
+            } catch (e) {
+                console.error('Error updating history:', e);
+            }
+        }
+    });
+
+    // Initialize when page loads
+    window.addEventListener('load', function() {
+        initChart();
+    });
+</script>
+</body>
+</html>

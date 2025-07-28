@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RKCL Debug Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: 100vh;
+        }
+        .header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .panel h2 {
+            margin-bottom: 20px;
+            color: #4facfe;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .debug-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border-left: 4px solid #4facfe;
+        }
+        .debug-section h3 {
+            color: #4facfe;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        .debug-content {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 5px;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+        }
+        .btn-secondary {
+            background: linear-gradient(45deg, #a8edea, #fed6e3);
+            color: #333;
+        }
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(168, 237, 234, 0.4);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4facfe;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .loading {
+            opacity: 0.6;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .emoji {
+            font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', 'Android Emoji', 'EmojiOne Color', 'Twemoji Mozilla', 'Segoe UI', sans-serif;
+            font-size: 2em;
+            vertical-align: middle;
+        }
+
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="header" style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
+        <span class="emoji">🐛</span>
+        <h1>Robokeys ShellGuard - Debug Dashboard</h1>
+    </div>
+
+    <!-- System Status & Infrastructure -->
+    <div class="panel">
+        <h2>🔧 System Status</h2>
+
+        <div class="debug-section">
+            <h3>Engine Info</h3>
+            <div class="debug-content"
+                 hx-get="/api/shellguard/engine/debug-info"
+                 hx-trigger="load, every 10s"
+                 hx-target="this"
+                 hx-swap="innerHTML">
+                <div class="loading">Loading engine info...</div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>SSH Sessions</h3>
+            <div class="debug-content"
+                 hx-get="/api/debug/infrastructure/debug/ssh-sessions"
+                 hx-trigger="load, every 5s"
+                 hx-target="this"
+                 hx-swap="innerHTML">
+                <div class="loading">Loading SSH sessions...</div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>Execution Sink Status</h3>
+            <div class="debug-content"
+                 hx-get="/api/debug/infrastructure/debug/execution-sink"
+                 hx-trigger="load, every 10s"
+                 hx-target="this"
+                 hx-swap="innerHTML">
+                <div class="loading">Loading execution sink info...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow Debug -->
+    <div class="panel">
+        <h2>⚙️ Workflow Debug</h2>
+
+        <div class="stats-grid"
+             hx-get="/api/shellguard/engine/debug-workflows"
+             hx-trigger="load, every 5s"
+             hx-target="this"
+             hx-swap="innerHTML">
+            <div class="loading">Loading workflow stats...</div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="refreshWorkflows()">🔄 Refresh Workflows</button>
+            <button class="btn btn-secondary" onclick="showDetailedWorkflows()">📊 Show Details</button>
+        </div>
+
+        <div class="debug-section">
+            <h3>Recent Workflows</h3>
+            <div class="debug-content" id="detailed-workflows">
+                Click "Show Details" to see workflow breakdown
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Commands -->
+    <div class="panel">
+        <h2>🧪 Test Commands</h2>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="submitTestCommand()">📤 Submit Test</button>
+            <button class="btn btn-primary" onclick="submitAndComplete()">⚡ Submit & Complete</button>
+            <button class="btn btn-secondary" onclick="testFailure()">❌ Test Failure</button>
+            <button class="btn btn-secondary" onclick="testRejection()">🚫 Test Rejection</button>
+            <button class="btn btn-primary" onclick="testMultiple()">📊 Multiple Commands</button>
+        </div>
+
+        <div class="debug-section">
+            <h3>Test Results</h3>
+            <div class="debug-content" id="test-results">
+                No tests run yet. Click a test button above.
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>Command History Status</h3>
+            <div class="debug-content"
+                 hx-get="/api/test/history-status"
+                 hx-trigger="load, every 10s"
+                 hx-target="this"
+                 hx-swap="innerHTML">
+                <div class="loading">Loading history status...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Bus Debug -->
+    <div class="panel">
+        <h2>📡 Event Bus Debug</h2>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="fireEvent('SUBMITTED')">📤 Fire SUBMITTED</button>
+            <button class="btn btn-primary" onclick="fireEvent('COMPLETED')">✅ Fire COMPLETED</button>
+            <button class="btn btn-secondary" onclick="fireEvent('FAILED')">❌ Fire FAILED</button>
+            <button class="btn btn-secondary" onclick="clearEvents()">🗑️ Clear Events</button>
+        </div>
+
+        <div class="debug-section">
+            <h3>Event Bus Activity</h3>
+            <div class="debug-content"
+                 hx-get="/api/test/events/received"
+                 hx-trigger="load, every 3s"
+                 hx-target="this"
+                 hx-swap="innerHTML">
+                <div class="loading">Loading event bus activity...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Test command functions
+    async function submitTestCommand() {
+        try {
+            const response = await fetch('/api/test/submit-test-command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'command=echo&parameter=debug test'
+            });
+            const result = await response.json();
+            document.getElementById('test-results').textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            document.getElementById('test-results').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    async function submitAndComplete() {
+        try {
+            const response = await fetch('/api/test/submit-and-complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'command=pwd&parameter='
+            });
+            const result = await response.json();
+            document.getElementById('test-results').textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            document.getElementById('test-results').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    async function testFailure() {
+        try {
+            const response = await fetch('/api/test/test-failure', { method: 'POST' });
+            const result = await response.json();
+            document.getElementById('test-results').textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            document.getElementById('test-results').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    async function testRejection() {
+        try {
+            const response = await fetch('/api/test/test-rejection', { method: 'POST' });
+            const result = await response.json();
+            document.getElementById('test-results').textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            document.getElementById('test-results').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    async function testMultiple() {
+        try {
+            const response = await fetch('/api/test/test-multiple-commands', { method: 'POST' });
+            const result = await response.json();
+            document.getElementById('test-results').textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            document.getElementById('test-results').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    // Event bus functions
+    async function fireEvent(phase) {
+        try {
+            const response = await fetch('/api/test/events/fire', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `phase=${phase}`
+            });
+            const result = await response.text();
+            console.log('Event fired:', result);
+        } catch (e) {
+            console.error('Event fire error:', e);
+        }
+    }
+
+    async function clearEvents() {
+        try {
+            const response = await fetch('/api/test/events/clear', { method: 'POST' });
+            const result = await response.text();
+            console.log('Events cleared:', result);
+        } catch (e) {
+            console.error('Clear events error:', e);
+        }
+    }
+
+    // Workflow functions
+    function refreshWorkflows() {
+        htmx.trigger('.stats-grid', 'refresh');
+    }
+
+    async function showDetailedWorkflows() {
+        try {
+            const response = await fetch('/api/shellguard/engine/debug-workflows-detailed');
+            const result = await response.json();
+            document.getElementById('detailed-workflows').textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            document.getElementById('detailed-workflows').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    // HTMX response interceptor for better JSON formatting
+    document.addEventListener('htmx:afterRequest', function(event) {
+        if (event.detail.xhr.getResponseHeader('Content-Type')?.includes('application/json')) {
+            try {
+                const jsonData = JSON.parse(event.detail.xhr.responseText);
+                event.target.textContent = JSON.stringify(jsonData, null, 2);
+            } catch (e) {
+                // If it's not JSON, leave it as is
+            }
+        }
+    });
+</script>
+</body>
+</html>

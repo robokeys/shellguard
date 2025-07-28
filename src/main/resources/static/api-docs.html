@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RKCL Terminal WebSocket API Reference</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 820px; margin: 0 auto; padding: 2em; background: #f6f8fa; color: #1a1a1a; }
+        h1, h2, h3 { color: #2462b7; }
+        code, pre { background: #eaf1fa; padding: 2px 6px; border-radius: 4px; }
+        pre { padding: 1em; overflow-x: auto; }
+        .note { background: #fff8e1; border-left: 4px solid #ffe066; padding: 1em; margin: 1.5em 0; border-radius: 6px; }
+        .warning { background: #ffe4e1; border-left: 4px solid #f56565; padding: 1em; margin: 1.5em 0; border-radius: 6px; }
+        .phase { font-weight: bold; color: #2872b7; }
+        .toc { background: #eaf1fa; padding: 1em; border-radius: 6px; margin-bottom: 2em; }
+        a { color: #2462b7; text-decoration: underline; }
+        @media (max-width: 600px) {
+            body { padding: 1em; }
+        }
+    </style>
+</head>
+<body>
+<h1>🖥️ RKCL Terminal WebSocket API Reference</h1>
+<div class="note">
+    <strong>Intended Use:</strong> This API is designed primarily for AI agents or programmatic clients to submit commands for terminal execution and monitor results via JSON over WebSockets.<br>
+    <br>
+    <strong>Testing & Approval:</strong> Command approvals are handled via the dedicated approval dashboard UI or REST API endpoints. This WebSocket API focuses on command submission and real-time output streaming.
+</div>
+<div class="toc">
+    <strong>Contents:</strong>
+    <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#connecting">Connecting</a></li>
+        <li><a href="#message-types">Message Types</a></li>
+        <li><a href="#status-phases">Phases (Command Lifecycle)</a></li>
+        <li><a href="#example-flow">Example Flow</a></li>
+        <li><a href="#error-handling">Error Handling</a></li>
+        <li><a href="#integration-notes">Integration Notes</a></li>
+    </ul>
+</div>
+
+<h2 id="overview">Overview</h2>
+<ul>
+    <li>All communication is JSON via WebSocket.</li>
+    <li>Used by <b>AI agents</b> to submit commands and receive real-time terminal output & statuses.</li>
+    <li>Command approval/rejection is handled via separate REST API endpoints and web dashboard.</li>
+</ul>
+
+<h2 id="connecting">Connecting</h2>
+<ul>
+    <li><b>URL:</b> <code>ws[s]://&lt;your-server&gt;/terminal</code></li>
+    <li><b>Protocol:</b> Standard WebSocket (<code>ws://</code> or <code>wss://</code>)</li>
+    <li><b>Authentication:</b> (If required, describe your approach here)</li>
+</ul>
+
+<h3>Testing with wscat</h3>
+<p>For quick testing, you can use <code>wscat</code> (WebSocket cat) to connect and send commands:</p>
+<pre># Install wscat
+npm install -g wscat
+
+# Connect to your server
+wscat -c ws://localhost:8080/terminal
+
+# Send commands (paste these as single lines)
+{"command": "LINE", "parameter": "ls -l", "uuid": "test-001", "sessionId": "default"}
+{"command": "TEXT", "parameter": "echo hello", "uuid": "test-002", "sessionId": "default"}
+{"command": "KEY", "parameter": "ENTER", "uuid": "test-003", "sessionId": "default"}
+
+# Or send text commands (even more concise)
+LINE:ls -l
+TEXT:echo hello
+KEY:ENTER
+</pre>
+
+<div class="note">
+    <strong>Tip:</strong> When using wscat, remember that each JSON message must be entered as a single line. Copy-paste the examples above directly into your wscat session.
+</div>
+
+<h2 id="message-types">Message Types</h2>
+
+<h3>Command Submission</h3>
+
+<h4>JSON Format:</h4>
+<pre>{"command": "LINE", "parameter": "ls -l", "uuid": "123e4567-e89b-12d3-a456-426614174000", "sessionId": "user-or-agent-session-id"}</pre>
+
+<h4>Text Format:</h4>
+<pre>LINE:ls -l</pre>
+
+<h4>Format Comparison:</h4>
+<ul>
+    <li><strong>JSON Format:</strong> Structured and explicit with metadata support - better for complex integrations</li>
+    <li><strong>Text Format:</strong> Concise and human-readable - efficient for AI agents (lower token usage), easier debugging and testing</li>
+</ul>
+
+<div class="note">
+    <strong>Note:</strong> RKCL's dual-format design comes from its embedded systems origins, optimized for both efficiency and simplicity.
+</div>
+
+<h4>Field Descriptions:</h4>
+
+<pre>{"command": "LINE", "parameter": "ls -l", "uuid": "123e4567-e89b-12d3-a456-426614174000", "sessionId": "user-or-agent-session-id"}</pre>
+<ul>
+    <li><code>command</code>: RKCL command type (required) - <strong>TEXT</strong>, <strong>LINE</strong>, <strong>KEY</strong>, <strong>COMBO</strong>, or <strong>EDIT</strong></li>
+    <li><code>parameter</code>: The actual shell command or key/text content to execute</li>
+    <li><code>uuid</code>: Unique command ID (auto-generated if not provided)</li>
+    <li><code>sessionId</code>: Session identifier (defaults to "default" if not provided)</li>
+</ul>
+
+<h4>RKCL Command Types:</h4>
+<ul>
+    <li><strong>TEXT</strong>: Send raw text (parameter: text to type)</li>
+    <li><strong>LINE</strong>: Send text followed by Enter key (parameter: command to execute)</li>
+    <li><strong>KEY</strong>: Send special keys (parameter: ENTER, BACKSPACE, TAB, ESC, etc.)</li>
+    <li><strong>COMBO</strong>: Send key combinations (parameter: CTRL-C, ALT-TAB, etc.)</li>
+    <li><strong>EDIT</strong>: Send edit commands (parameter: cut, copy, paste, selectall)</li>
+</ul>
+
+<div class="warning">
+    <strong>Important:</strong>
+    <ul>
+        <li>JSON messages must be sent as <strong>single-line strings</strong> over WebSocket - no pretty formatting with newlines</li>
+        <li>Shell commands in the <code>parameter</code> field must be single-line only</li>
+        <li>For multi-line operations, use command chaining (<code>&&</code>), pipes (<code>|</code>), or semicolons (<code>;</code>) instead</li>
+        <li><strong>Note:</strong> Multi-line commands can be tricky - expect them to be rejected by approvers for security reasons</li>
+    </ul>
+</div>
+
+<h3>Session Management</h3>
+
+<h4>Create SSH Session:</h4>
+<pre>{"action": "create_session", "sessionId": "optional-session-id", "host": "localhost", "username": "demo", "password": "demo123", "port": 22, "interactive": true}</pre>
+
+<h4>Connect to Existing Session:</h4>
+<pre>{"action": "connect_session", "sessionId": "existing-session-id", "interactive": true}</pre>
+
+<h4>List Sessions:</h4>
+<pre>{"action": "list_sessions"}</pre>
+
+<h3>Server Responses</h3>
+
+<h4>Command Accepted:</h4>
+<pre>{
+  "type": "command_accepted",
+  "uuid": "123e4567-e89b-12d3-a456-426614174000",
+  "sessionId": "user-session",
+  "success": true,
+  "message": "Command submitted for approval"
+}</pre>
+
+<h4>Terminal Output:</h4>
+<pre>{
+  "type": "terminal_output",
+  "output": "total 2\ndrwxr-xr-x 2 user user 4096 ...",
+  "sessionId": "user-session"
+}</pre>
+
+<h4>Session Created:</h4>
+<pre>{
+  "type": "session_created",
+  "sessionId": "new-session-123",
+  "success": true,
+  "message": "SSH session created"
+}</pre>
+
+<h2 id="status-phases">Phases (Command Lifecycle)</h2>
+<ul>
+    <li><span class="phase">SUBMITTED</span> — Command submitted, awaiting assessment</li>
+    <li><span class="phase">RISK_ASSESSED</span> — Automated risk analysis complete</li>
+    <li><span class="phase">PENDING_APPROVAL</span> — Human or policy approval required</li>
+    <li><span class="phase">APPROVED</span> — Approved, queued for execution</li>
+    <li><span class="phase">READY_TO_RUN</span> — Ready to execute, waiting in queue</li>
+    <li><span class="phase">REJECTED</span> — Rejected by human or automated rule</li>
+    <li><span class="phase">EXECUTION_STARTED</span> — Running on terminal</li>
+    <li><span class="phase">OUTPUT</span> — Partial terminal output (if streaming enabled)</li>
+    <li><span class="phase">COMPLETED</span> — Finished with result</li>
+    <li><span class="phase">FAILED</span> — Error during execution or workflow</li>
+</ul>
+<div class="note">
+    <strong>Note:</strong> Commands with immediate approval can bypass the queue and go directly from <span class="phase">APPROVED</span> to <span class="phase">EXECUTION_STARTED</span>.
+</div>
+
+<h2 id="example-flow">Example Flow</h2>
+
+<h3>Standard Flow:</h3>
+<ol>
+    <li><strong>Agent</strong> connects to WebSocket endpoint</li>
+    <li><strong>Agent</strong> creates or connects to SSH session</li>
+    <li><strong>Agent</strong> sends command submission message</li>
+    <li><strong>Server</strong> responds with <code>command_accepted</code></li>
+    <li><strong>Human operator</strong> approves via dashboard UI (or automated policy approves)</li>
+    <li><strong>Command</strong> enters <span class="phase">READY_TO_RUN</span> phase and waits in execution queue</li>
+    <li><strong>Server</strong> streams <code>terminal_output</code> messages with real-time results when executed</li>
+    <li><strong>Agent</strong> receives command completion notification</li>
+</ol>
+
+<h3>Immediate Approval Flow:</h3>
+<ol>
+    <li><strong>Agent</strong> connects to WebSocket endpoint</li>
+    <li><strong>Agent</strong> creates or connects to SSH session</li>
+    <li><strong>Agent</strong> sends command submission message</li>
+    <li><strong>Server</strong> responds with <code>command_accepted</code></li>
+    <li><strong>Human operator</strong> approves with immediate execution flag via dashboard UI</li>
+    <li><strong>Command</strong> bypasses queue and goes directly to <span class="phase">EXECUTION_STARTED</span></li>
+    <li><strong>Server</strong> streams <code>terminal_output</code> messages with real-time results</li>
+    <li><strong>Agent</strong> receives command completion notification</li>
+</ol>
+
+<h2 id="error-handling">Error Handling</h2>
+<pre>{
+  "type": "error",
+  "uuid": "",
+  "success": false,
+  "message": "Missing required 'command' field in JSON payload",
+  "metadata": {
+    "expectedFormat": {
+      "command": "string (required)",
+      "parameter": "string (optional)",
+      "uuid": "string (optional)",
+      "sessionId": "string (optional)"
+    }
+  }
+}</pre>
+
+<div class="warning">
+    <strong>Common Errors:</strong>
+    <ul>
+        <li>Invalid JSON format will return structured error with expected format</li>
+        <li>Missing required fields will be rejected with helpful error messages</li>
+        <li>Unsupported message formats (e.g. with <code>"type"</code> field) will be rejected</li>
+        <li>Session errors will be reported with specific error messages</li>
+    </ul>
+</div>
+
+<h2 id="integration-notes">Integration Notes</h2>
+<ul>
+    <li>Maintain an open WebSocket for real-time updates and output streaming</li>
+    <li>Use UUIDs to correlate command submissions with results</li>
+    <li>Commands are processed through approval workflow - use dashboard UI for approvals</li>
+    <li>Session management allows multiple SSH connections per WebSocket</li>
+    <li>All terminal output is streamed in real-time to connected clients</li>
+</ul>
+
+<div class="note">
+    <strong>Command Approval:</strong> Commands submitted via this API require approval through the <strong>Approval Dashboard</strong> web UI at <code>/approval-dashboard</code> or via REST API endpoints (<code>/api/shellguard/engine/approve/{actionId}</code>).<br>
+    <br>
+    <strong>Tip:</strong> For production use, AI agents should connect, submit commands, and monitor outputs via this WebSocket API. Human operators should handle approvals using the <strong>Approval Dashboard</strong> web UI.
+</div>
+
+<hr>
+<p style="font-size:0.95em;color:#888;">
+    &copy; 2025 Robokeys Ltd. | RKCL is open source. See <a href="https://github.com/robokeys/rkcl">GitHub</a> for source and license.
+</p>
+</body>
+</html>

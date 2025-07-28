@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RKCL Terminal Test Client</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 20px;
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            border: 1px solid #444;
+            margin: 10px 0;
+            padding: 15px;
+            background-color: #2d2d2d;
+            border-radius: 5px;
+        }
+
+        .terminal-output {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #000;
+            padding: 10px;
+            border: 1px solid #333;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        .command-input {
+            width: 100%;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 3px;
+        }
+
+        .button {
+            padding: 8px 16px;
+            margin: 5px;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .button:hover {
+            background-color: #005a9e;
+        }
+
+        .button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+
+        .status.connected {
+            background-color: #2d5a2d;
+            border: 1px solid #4a8a4a;
+        }
+
+        .status.disconnected {
+            background-color: #5a2d2d;
+            border: 1px solid #8a4a4a;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            align-items: center;
+        }
+
+        .input-group input, .input-group select {
+            padding: 8px;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 3px;
+        }
+
+        .quick-commands {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 5px;
+            margin: 10px 0;
+        }
+
+        .button.sending {
+            background-color: #666 !important;
+            cursor: not-allowed !important;
+            opacity: 0.6;
+        }
+
+        .button.sending:hover {
+            background-color: #666 !important;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div style="display: flex; align-items: flex-start; justify-content: flex-start; gap: 1.2rem;">
+        <img src="robo-approver.png" alt="AI Approval Robot"
+             style="width: 92px; height: 92px; object-fit: contain;"/>
+        <h1> Robokeys ShellGuard - Terminal Test Client</h1>
+    </div>
+    <p>Test client for RKCL Terminal Bridge - Universal AI Terminal Automation</p>
+
+    <!-- Connection Status -->
+    <div class="panel">
+        <h3>🔌 Connections</h3>
+        <div id="websocketStatus" class="status disconnected">Disconnected</div>
+        <div id="sshStatus" class="status disconnected">SSH Session: Not Created</div>
+        <button id="connectBtn" class="button">Connect WebSocket</button>
+        <button id="disconnectBtn" class="button" disabled>Disconnect WebSocket</button>
+
+    </div>
+
+    <!-- SSH Session Management -->
+    <div class="panel">
+        <h3>🛠️ SSH Session</h3>
+        <div class="input-group">
+            <input type="text" id="sshHost" placeholder="Host" value="localhost">
+            <input type="text" id="sshUser" placeholder="Username" value="demo">
+            <input type="password" id="sshPass" placeholder="Password" value="demo">
+            <input type="number" id="sshPort" placeholder="Port" value="22" style="width: 80px;">
+        </div>
+        <div class="input-group">
+            <input type="text" id="sessionId" placeholder="Session ID (optional)" value="default">
+            <button id="createSessionBtn" class="button" disabled>Create Session</button>
+            <button id="refreshSessionsBtn" class="button" disabled>Refresh Sessions</button>
+            <button id="connectSessionBtn" class="button" disabled>Connect to Existing</button>
+            <button id="disconnectSessionBtn" class="button" disabled>Disconnect Current</button>
+
+        </div>
+        <div id="sessionsList"
+             style="margin-top: 10px; padding: 10px; background: #333; border-radius: 3px; display: none;">
+            <strong>Available Sessions:</strong>
+            <div id="sessionsContent"></div>
+        </div>
+    </div>
+
+    <!-- Terminal Output -->
+    <div class="panel">
+        <h3>📺 Terminal Output</h3>
+        <div id="terminalOutput" class="terminal-output">Waiting for terminal output...</div>
+        <button id="clearOutputBtn" class="button">Clear Output</button>
+    </div>
+
+    <!-- Quick Commands -->
+    <div class="panel">
+        <h3>⚡ Quick Commands</h3>
+        <div class="quick-commands">
+            <button class="button" onclick="sendQuickCommand('LINE', 'ls -la')">ls -la</button>
+            <button class="button" onclick="sendQuickCommand('KEY', 'ENTER')">Enter</button>
+            <button class="button" onclick="sendQuickCommand('TEXT', 'pwd')">pwd</button>
+            <button class="button" onclick="sendQuickCommand('TEXT', 'whoami')">whoami</button>
+            <button class="button" onclick="sendQuickCommand('COMBO', 'CTRL-C')">Ctrl+C</button>
+            <button class="button" onclick="sendQuickCommand('TEXT', 'clear')">clear</button>
+            <button class="button" onclick="sendQuickCommand('LINE', 'date')">date</button>
+            <button class="button" onclick="sendQuickCommand('LINE', 'echo test')">echo</button>
+        </div>
+    </div>
+
+    <!-- Command Input -->
+    <div class="panel">
+        <h3>⌨️ Send Commands</h3>
+
+        <!-- Text Command -->
+        <div class="input-group">
+            <input type="text" id="textInput" placeholder="Type text to send">
+            <button onclick="sendTextCommand()" class="button">Send Text</button>
+        </div>
+
+        <!-- RKCL Command -->
+        <div class="input-group">
+            <select id="commandType">
+                <option value="TEXT">TEXT</option>
+                <option value="LINE">LINE</option>
+                <option value="KEY">KEY</option>
+                <option value="COMBO">COMBO</option>
+                <option value="EDIT">EDIT</option>
+            </select>
+            <input type="text" id="commandParam" placeholder="Parameter">
+            <button onclick="sendRkclCommand()" class="button">Send RKCL</button>
+        </div>
+
+        <!-- JSON Command -->
+        <div class="input-group">
+            <textarea id="jsonInput" rows="3" placeholder='{"command": "TEXT", "parameter": "hello world"}'
+                      style="flex: 1;"></textarea>
+            <button onclick="sendJsonCommand()" class="button">Send JSON</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let ws = null;
+    let isConnected = false;
+    let isSshConnected = false;
+    let currentSessionId = null;
+    let currentPartialLine = null;
+    let partialLineElement = null;
+
+    // DOM elements
+    const connectionStatus = document.getElementById('websocketStatus');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const terminalOutput = document.getElementById('terminalOutput');
+    const createSessionBtn = document.getElementById('createSessionBtn');
+    const refreshSessionsBtn = document.getElementById('refreshSessionsBtn')
+    const connectSessionBtn = document.getElementById('connectSessionBtn');
+    const disconnectSessionBtn = document.getElementById('disconnectSessionBtn');
+
+    let lastCommandTime = 0;
+    let isCommandInProgress = false;
+    const COMMAND_DEBOUNCE_MS = 750; // 3/4 second debounce
+
+
+    function updateStatus() {
+        if (isConnected) {
+            connectionStatus.textContent = 'WebSocket: Connected';
+            connectionStatus.className = 'status connected';
+            connectBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            createSessionBtn.disabled = false;
+            refreshSessionsBtn.disabled = false;
+            connectSessionBtn.disabled = false;
+            disconnectSessionBtn.disabled = !isSshConnected;
+        } else {
+            connectionStatus.textContent = 'WebSocket: Disconnected';
+            connectionStatus.className = 'status disconnected';
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            createSessionBtn.disabled = true;
+            refreshSessionsBtn.disabled = true;
+            connectSessionBtn.disabled = true;
+            disconnectSessionBtn.disabled = true;
+        }
+
+        const sshStatus = document.getElementById('sshStatus');
+        if (isSshConnected && currentSessionId) {
+            sshStatus.textContent = `SSH Session: Connected (${currentSessionId})`;
+            sshStatus.className = 'status connected';
+        } else {
+            sshStatus.textContent = 'SSH Session: Not Created';
+            sshStatus.className = 'status disconnected';
+        }
+    }
+
+    function refreshSessions() {
+        log('Refreshing session list...');
+        send({action: 'list_sessions'});
+    }
+
+    function connect() {
+        if (ws) {
+            ws.close();
+        }
+
+        ws = new WebSocket('ws://localhost:8080/terminal');
+
+        ws.onopen = function () {
+            isConnected = true;
+            updateStatus();
+            log('Connected to RKCL Terminal Bridge');
+            console.log('✅ WebSocket connected!', event);
+            addToTerminal('Connected to RKCL Terminal Bridge', 'status');
+        };
+
+        const terminal = document.getElementById('terminal');
+
+        // Add this missing function
+        function addToTerminal(text, type = 'output') {
+            const div = document.createElement('div');
+            div.className = `output ${type}`;
+            div.textContent = text;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+
+        ws.onmessage = function (event) {
+            try {
+                const response = JSON.parse(event.data);
+                handleResponse(response);
+            } catch (e) {
+                log('Invalid JSON received: ' + event.data);
+            }
+        };
+
+        ws.onclose = function () {
+            isConnected = false;
+            updateStatus();
+            log('Disconnected from RKCL Terminal Bridge');
+            console.warn('🔌 WebSocket closed:');
+        };
+
+        ws.onerror = function (error) {
+            console.error('❌ WebSocket error:', error);
+            console.error('Ready state:', ws.readyState);
+            addToTerminal('WebSocket error - check console', 'error');
+        };
+    }
+
+    function disconnect() {
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+    }
+
+    function disconnectSession() {
+        if (!currentSessionId) {
+            log('No active session to disconnect');
+            return;
+        }
+
+        const disconnectData = {
+            action: 'disconnect_session',
+            sessionId: currentSessionId
+        };
+
+        send(disconnectData);
+        isSshConnected = false;
+        currentSessionId = null;
+        updateStatus();
+    }
+
+    function createSession() {
+        const sessionData = {
+            action: 'create_session',
+            sessionId: document.getElementById('sessionId').value || undefined,
+            host: document.getElementById('sshHost').value,
+            username: document.getElementById('sshUser').value,
+            password: document.getElementById('sshPass').value,
+            port: parseInt(document.getElementById('sshPort').value) || 22
+        };
+
+        send(sessionData);
+    }
+
+    function connectToSession() {
+        const sessionId = document.getElementById('sessionId').value || 'default';
+
+        const connectData = {
+            action: 'connect_session',
+            sessionId: sessionId
+        };
+
+        log(`Attempting to connect to existing session: ${sessionId}`);
+        send(connectData);
+    }
+
+    function listSessions() {
+        log('Requesting session list...');
+        send({action: 'list_sessions'});
+    }
+
+    function sendTextCommand() {
+        const text = document.getElementById('textInput').value;
+        if (!text) return;
+
+        sendRkclData('LINE', text); // LINE adds newline automatically
+        document.getElementById('textInput').value = '';
+    }
+
+    function sendRkclCommand() {
+        const command = document.getElementById('commandType').value;
+        const parameter = document.getElementById('commandParam').value;
+
+        sendRkclData(command, parameter);
+        document.getElementById('commandParam').value = '';
+    }
+
+    function sendJsonCommand() {
+        const json = document.getElementById('jsonInput').value;
+        if (!json) return;
+
+        try {
+            const data = JSON.parse(json);
+            send(data);
+            document.getElementById('jsonInput').value = '';
+        } catch (e) {
+            log('Invalid JSON: ' + e.message);
+        }
+    }
+
+    function sendQuickCommand(command, parameter) {
+        if (send({
+            command: command,
+            parameter: parameter || undefined,
+            sessionId: currentSessionId,
+            uuid: 'client-' + Date.now()
+        })) {
+            log(`Quick command sent: ${command} ${parameter || ''}`);
+        }
+    }
+
+    function sendRkclData(command, parameter) {
+        if (send({
+            command: command,
+            parameter: parameter || undefined,
+            sessionId: currentSessionId,
+            uuid: 'client-' + Date.now()
+        })) {
+            log(`RKCL command sent: ${command} ${parameter || ''}`);
+        }
+    }
+
+    function disableCommandButtons(disabled) {
+        const buttons = document.querySelectorAll('.quick-commands .button, button[onclick*="send"]');
+        buttons.forEach(btn => {
+            if (disabled) {
+                btn.classList.add('sending');
+                btn.disabled = true;
+            } else {
+                btn.classList.remove('sending');
+                btn.disabled = false;
+            }
+        });
+    }
+
+    function send(data) {
+        if (!isConnected || !ws) {
+            log('WebSocket: Not connected');
+            return false;
+        }
+
+        // Check debounce timing
+        const now = Date.now();
+        if (now - lastCommandTime < COMMAND_DEBOUNCE_MS) {
+            log(`Command ignored - too fast! Wait ${COMMAND_DEBOUNCE_MS}ms between commands`);
+            return false;
+        }
+
+        if (isCommandInProgress) {
+            log('Command ignored - previous command still in progress');
+            return false;
+        }
+
+        // Set command in progress
+        isCommandInProgress = true;
+        lastCommandTime = now;
+
+        // Disable command buttons
+        disableCommandButtons(true);
+
+        const jsonStr = JSON.stringify(data);
+        ws.send(jsonStr);
+        log('SENT: ' + jsonStr);
+
+        // Re-enable buttons after debounce period
+        setTimeout(() => {
+            isCommandInProgress = false;
+            disableCommandButtons(false);
+        }, COMMAND_DEBOUNCE_MS);
+
+        return true;
+    }
+
+    function handleResponse(response) {
+        log('RECEIVED: ' + JSON.stringify(response, null, 2));
+
+        switch (response.type) {
+            case 'terminal_output':
+                addTerminalOutput(response.output);
+                break;
+
+            case 'session_created':
+                log(`✅ SSH session created called: ${response.sessionId}`);
+                if (response.success) {
+                    log(`✅ SSH session created: ${response.sessionId}`);
+                    currentSessionId = response.sessionId;
+                    isSshConnected = true;
+                } else {
+                    log(`❌ SSH session creation failed: ${response.sessionId}`);
+                    isSshConnected = false;
+                    currentSessionId = null;
+                }
+                updateStatus();
+                break;
+
+            case 'session_connected':
+                console.log('🔍 Session connected response:', response);
+                log(`✅ Connected to existing session: ${response.sessionId}`);
+                currentSessionId = response.sessionId;
+                isSshConnected = true;
+                console.log('🔍 Updated state - currentSessionId:', currentSessionId, 'isSshConnected:', isSshConnected);
+                updateStatus();
+                break;
+
+            case 'session_disconnected':
+                log(`✅ Disconnected from session: ${response.sessionId}`);
+                if (response.sessionId === currentSessionId) {
+                    isSshConnected = false;
+                    currentSessionId = null;
+                    updateStatus();
+                }
+                break;
+
+            case 'command_result':
+                if (response.success) {
+                    log(`✅ ${response.message}`);
+                } else {
+                    log(`❌ ${response.message}`);
+                }
+                break;
+
+            case 'status':
+                log(`ℹ️ ${response.message}`);
+                if (response.metadata) {
+                    log('Metadata: ' + JSON.stringify(response.metadata, null, 2));
+                }
+                break;
+
+            case 'sessions_list':
+                log('📋 Available sessions:');
+                const sessions = response.metadata ? response.metadata.sessions : response.sessions;
+
+                if (sessions && sessions.length > 0) {
+                    sessions.forEach(session => {
+                        log(`  - ${session.sessionId}`);
+                    });
+                } else {
+                    log('  (no active sessions)');
+                }
+
+                displaySessionsList(sessions);
+                break;
+
+            case 'terminal_partial':
+                addPartialOutput(response.output);
+                break;
+
+            case 'error':
+                log(`🚨 Error: ${response.message}`);
+                if (response.message.includes('Session') || response.message.includes('SSH')) {
+                    isSshConnected = false;
+                    updateStatus();
+                }
+                break;
+        }
+    }
+
+    function displaySessionsList(sessions) {
+        const sessionsList = document.getElementById('sessionsList');
+        const sessionsContent = document.getElementById('sessionsContent');
+
+        if (sessions && sessions.length > 0) {
+            let html = '';
+            sessions.forEach(session => {
+                html += `<div style="margin: 5px 0; padding: 5px; background: #444; border-radius: 3px;">
+                    📡 <strong>${session.sessionId}</strong>
+                   <button onclick="connectToSpecificSession('${session.sessionId}')" class="button" style="margin-left: 10px; padding: 4px 8px; font-size: 12px;">Connect</button>
+               </div>`;
+            });
+            sessionsContent.innerHTML = html;
+            sessionsList.style.display = 'block';
+        } else {
+            log('  (no active sessions)');
+            sessionsContent.innerHTML = '<div style="color: #888; font-style: italic;">No active sessions</div>';
+            sessionsList.style.display = 'block';
+        }
+    }
+
+    function connectToSpecificSession(sessionId) {
+        document.getElementById('sessionId').value = sessionId;
+        connectToSession();
+    }
+
+    function addTerminalOutput(output) {
+        if (terminalOutput.textContent === 'Waiting for terminal output...') {
+            terminalOutput.textContent = '';
+        }
+
+        clearPartialLine();
+
+        terminalOutput.textContent += output + '\n';
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    function addPartialOutput(output) {
+        const terminal = document.getElementById('terminalOutput');
+
+        if (terminal.textContent === 'Waiting for terminal output...') {
+            terminal.textContent = '';
+        }
+
+        if (!partialLineElement) {
+            partialLineElement = document.createElement('div');
+            partialLineElement.style.opacity = '0.8';
+            partialLineElement.style.borderLeft = '2px solid #007acc';
+            partialLineElement.style.paddingLeft = '5px';
+            partialLineElement.style.color = '#007acc';
+            partialLineElement.style.fontFamily = 'inherit';
+            terminal.appendChild(partialLineElement);
+        }
+        partialLineElement.textContent = output;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function clearPartialLine() {
+        if (partialLineElement) {
+            partialLineElement.remove();
+            partialLineElement = null;
+        }
+    }
+
+    function log(message) {
+        console.log(message);
+        // You could also display logs in a separate panel if needed
+    }
+
+    // Event listeners
+    connectBtn.addEventListener('click', connect);
+    disconnectBtn.addEventListener('click', disconnect);
+    createSessionBtn.addEventListener('click', createSession);
+    refreshSessionsBtn.addEventListener('click', refreshSessions);
+    connectSessionBtn.addEventListener('click', connectToSession);
+    disconnectSessionBtn.addEventListener('click', disconnectSession);
+
+    document.getElementById('clearOutputBtn').addEventListener('click', function () {
+        terminalOutput.textContent = 'Waiting for terminal output...';
+    });
+
+    // Handle Enter key
+    document.getElementById('textInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            sendTextCommand();
+        }
+    });
+
+    document.getElementById('commandParam').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            sendRkclCommand();
+        }
+    });
+
+    // Initialize
+    updateStatus();
+    log('RKCL Terminal Test Client ready');
+
+    // Auto-connect for demo
+    setTimeout(() => {
+        connect();
+    }, 500);
+</script>
+</body>
+</html>

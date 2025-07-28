@@ -1,0 +1,106 @@
+# application.yml - Main configuration
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+spring:
+#  web:
+#    cors:
+#      allow-credentials: false
+  application:
+    name: rkcl-terminal-bridge
+
+  # Disable security for now (add back later)
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  # Database configuration (H2 for development)
+  datasource:
+    url: jdbc:h2:mem:rkcl
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # JSON configuration
+  jackson:
+    serialization:
+      indent-output: true
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# Logging configuration
+logging:
+  level:
+    tech.robd.rkcl: DEBUG
+    org.springframework.web.socket: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints (for monitoring)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# RKCL specific configuration
+workflow:
+  engine: single
+  single:
+    assessor: ruleBasedAssessor
+    # assessor: EXAMPLES - autoApproveAssessor OR failSafeAssessor OR ruleBasedAssessor
+    human: false
+robokeyterm:
+  log-level: info
+  ui-theme: dark
+rkcl:
+  stub-ssh-server:
+    enabled: true
+    username: demo
+    password: demo
+  protocol-version: 1.0
+  allowed-commands: [TEXT, LINE, KEY, COMBO]
+  terminal:
+    max-sessions: 10
+    session-timeout: 300000  # 5 minutes
+    command-timeout: 30000   # 30 seconds
+    max-output-buffer: 10000 # lines
+
+  ssh:
+    connection-timeout: 30000
+    keep-alive-interval: 60000
+    max-retry-attempts: 3
+    host: production-server.com
+    port: 22
+    username: your-user
+    password: your-password  #
+  websocket:
+    allowed-origins: "*"
+    max-text-message-size: 65536
+    max-binary-message-size: 65536
+uuid:
+  sequential: true  # false for production
+  prefix: "cmd"     # optional customization

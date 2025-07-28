@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RKCL Command Approval System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            background: #f4f7fa;
+            font-family: system-ui, sans-serif;
+            color: #23324b;
+            margin: 0; padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 4rem auto 0 auto;
+            padding: 2rem;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 32px #0001;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-top: 0;
+            color: #1a68d1;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+        .logo {
+            width: 42px; height: 42px; vertical-align: middle;
+            border-radius: 50%; object-fit: cover;
+            box-shadow: 0 2px 6px #0002;
+        }
+        ul {
+            line-height: 1.8;
+            padding-left: 1.2em;
+        }
+        .note {
+            background: #eaf1fd;
+            padding: 1em;
+            border-left: 4px solid #1a68d1;
+            border-radius: 8px;
+            margin: 2em 0;
+        }
+        a {
+            color: #1a68d1;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 650px) {
+            .container { margin: 0.5rem; padding: 1rem; }
+            h1 { font-size: 1.3rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>
+        <img class="logo" src="robo-approver.png" alt="AI Approval Robot" />
+        RKCL Command Approval System
+    </h1>
+    <div class="note">
+        <strong>For AI integration:</strong>
+        This system is designed for AI agents and automated clients.
+        <br>Commands are sent and monitored using the <strong>WebSocket JSON API</strong>.
+    </div>
+
+    <div class="section">
+        <h2>🔧 User Interfaces</h2>
+        <ul class="api-links">
+            <li>
+                <a href="approval-dashboard.html">AI Command Approval Center</a><br>
+                <small>Web dashboard for monitoring and approving AI-requested terminal actions.</small>
+            </li>
+            <li>
+                <a href="terminal-test-client.html">Terminal Test Client</a><br>
+                <small>Manual or scripted test client for sending commands and viewing results. Useful for debugging or AI training.</small>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>📚 Documentation</h2>
+        <ul class="api-links">
+            <li>
+                <a href="api-docs.html">WebSocket API Documentation</a><br>
+                <small>Specification for the JSON API used by AI agents and integration clients.</small>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🎛️ Administration Dashboards</h2>
+        <div class="dashboard-grid">
+            <a href="admin-dashboard.html" class="dashboard-card admin">
+                <h3>📊 Admin Dashboard</h3>
+                <p>System administration, monitoring, and control. View engine statistics, SSH sessions, and command history.</p>
+            </a>
+            <a href="debug-dashboard.html" class="dashboard-card debug">
+                <h3>🐛 Debug Dashboard</h3>
+                <p>Technical debugging tools, workflow analysis, test commands, and event bus monitoring.</p>
+            </a>
+        </div>
+    </div>
+
+
+    <p>
+        <strong>Production Use:</strong>
+        In normal operation, AI agents connect to the WebSocket JSON API to submit commands for approval and execution.
+    </p>
+    <p style="font-size:0.95em; color:#6a7d9c;">
+        &copy; 2025 Robokeys Ltd &mdash; <a href="https://robokeys.tech" target="_blank">robokeys.tech</a>
+    </p>
+</div>
+</body>
+</html>

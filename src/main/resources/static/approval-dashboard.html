@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robokeys ShellGuard - AI Command Approval Dashboard</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: 100vh;
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .panel {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel h2 {
+            margin-bottom: 20px;
+            color: #4facfe;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .terminal-output {
+            flex: 1;
+            background: #000;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            overflow-y: auto;
+            border: 1px solid #333;
+            white-space: pre-wrap;
+            max-height: 500px;
+        }
+
+        .approval-queue {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 60vh; /* Limits the approval queue to 60% of viewport height */
+            padding-right: 5px; /* Add small padding for scrollbar */
+        }
+
+        approval-queue::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .approval-queue::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .approval-queue::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .approval-queue::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .command-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--risk-color);
+            transition: all 0.3s ease;
+        }
+
+        .command-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .command-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .command-text {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #4facfe;
+            margin-bottom: 8px;
+        }
+
+        .command-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .meta-label {
+            color: #aaa;
+            font-size: 0.8rem;
+            margin-bottom: 2px;
+        }
+
+        .meta-value {
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .risk-low { --risk-color: #4ade80; }
+        .risk-medium { --risk-color: #fbbf24; }
+        .risk-high { --risk-color: #f87171; }
+        .risk-critical { --risk-color: #dc2626; }
+
+        .approval-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-approve {
+            background: linear-gradient(45deg, #4ade80, #22c55e);
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: linear-gradient(45deg, #22c55e, #16a34a);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-reject {
+            background: linear-gradient(45deg, #f87171, #ef4444);
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .status-indicator {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-pending { background: #fbbf24; color: #000; }
+        .status-approved { background: #4ade80; color: #000; }
+        .status-rejected { background: #f87171; color: #000; }
+        .status-auto-approved { background: #8b5cf6; color: #fff; }
+
+        .history-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .history-command {
+            font-family: 'Consolas', 'Monaco', monospace;
+            flex: 1;
+        }
+
+        .history-status {
+            margin-left: 10px;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            z-index: 1000;
+        }
+
+        .connected { background: #4ade80; color: #000; }
+        .disconnected { background: #f87171; color: #fff; }
+
+        .assessor-trail {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .assessor-step {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .assessor-name {
+            color: #4facfe;
+            font-weight: 500;
+        }
+
+        .assessor-result {
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+
+        .queue-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .session-info-container {
+            margin-bottom: 15px;
+        }
+
+        .session-info {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--session-color);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .session-info.active { --session-color: #4ade80; }
+        .session-info.no-sessions { --session-color: #f87171; }
+
+        .session-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            min-width: 90px;
+            text-align: center;
+        }
+
+        .session-status.connected {
+            background: #4ade80;
+            color: #000;
+        }
+
+        .session-status.disconnected {
+            background: #f87171;
+            color: #fff;
+        }
+
+        .session-details {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .session-detail {
+            display: flex;
+            flex-direction: column;
+            min-width: 120px;
+        }
+
+        .detail-label {
+            color: #aaa;
+            font-size: 0.75rem;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+
+        .detail-value {
+            color: #fff;
+            font-weight: 500;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .status-auto-approved {
+            background: linear-gradient(45deg, #4ade80, #22c55e);
+            color: #000;
+            font-weight: 700;
+        }
+
+        .command-item.auto-approved {
+            border-left: 4px solid #4ade80;
+            background: rgba(74, 222, 128, 0.05);
+        }
+
+        .btn-revoke {
+            background: linear-gradient(45deg, #f59e0b, #d97706);
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .btn-revoke:hover {
+            background: linear-gradient(45deg, #d97706, #b45309);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(217, 119, 6, 0.4);
+        }
+
+        .auto-execution-notice {
+            font-size: 0.8rem;
+            color: #4ade80;
+            font-style: italic;
+            margin-left: 10px;
+            opacity: 0.8;
+        }
+
+        /* ADD THESE NEW STYLES */
+        .command-preview-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .command-preview-section h3 {
+            margin-bottom: 10px;
+            color: #4facfe;
+            font-size: 1.1rem;
+        }
+
+        /* Que preview styles */
+
+        .queue-item {
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            border-left: 3px solid var(--risk-color);
+            background: rgba(255, 255, 255, 0.03);
+            font-size: 0.9rem;
+        }
+
+        .queue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .queue-position {
+            font-weight: bold;
+            color: #4facfe;
+            font-size: 1rem;
+        }
+
+        .queue-time {
+            color: #888;
+            font-size: 0.8rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .queue-status-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .queue-status {
+            font-weight: 600;
+            font-size: 0.8rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            white-space: nowrap;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .queue-explanation {
+            color: #aaa;
+            font-size: 0.85rem;
+            flex: 1;
+        }
+
+        .queue-command {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-weight: 500;
+            color: #fff;
+            font-size: 1rem;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            border-left: 3px solid #4facfe;
+        }
+
+        /* Add subtle separator between items */
+        .queue-item:not(:last-child)::after {
+            content: '';
+            display: block;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            margin-top: 6px;
+        }
+
+        /* Queue status colors remain the same */
+        .queue-next .queue-status {
+            background: #22c55e;
+            color: #000;
+        }
+
+        .queue-executing .queue-status {
+            background: #3b82f6;
+            color: #fff;
+            animation: pulse 1.5s infinite;
+        }
+
+        .queue-blocking .queue-status {
+            background: #f59e0b;
+            color: #000;
+        }
+
+        .queue-blocked .queue-status {
+            background: #6b7280;
+            color: #fff;
+        }
+
+        .queue-ready .queue-status {
+            background: #4ade80;
+            color: #000;
+        }
+
+        .queue-waiting .queue-status {
+            background: #8b5cf6;
+            color: #fff;
+        }
+
+        .queue-summary {
+            text-align: center;
+            color: #aaa;
+            font-style: italic;
+            margin-top: 15px;
+            padding: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 6px;
+        }
+
+        @media (max-width: 768px) {
+            .queue-status-line {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .queue-status {
+                min-width: auto;
+            }
+        }
+
+    </style>
+</head>
+<body>
+<div class="connection-status disconnected" id="connectionStatus">
+    🔌 Disconnected
+</div>
+
+<div class="dashboard">
+    <div class="header">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 1.2rem;">
+             <img src="robo-approver.png" alt="AI Approval Robot"
+                 style="width: 92px; height: 92px; object-fit: contain;" />
+             <h1>Robokeys ShellGuard - AI Command Approval Center</h1>
+        </div>
+        <p>Monitor and approve AI-requested terminal actions</p>
+
+    </div>
+
+    <!-- Live Terminal Output -->
+    <div class="panel">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <h2>📺 Live Terminal Output</h2>
+            <button onclick="refreshSessionInfo()" class="refresh-btn">🔄 Refresh Session</button>
+        </div>
+        <!-- SSH Session Info -->
+        <div class="session-info-container"
+             hx-get="/api/shellguard/engine/session-info"
+             hx-trigger="load, every 10s"
+             hx-headers='{"Cache-Control": "no-cache"}'
+             hx-target="this"
+             hx-swap="innerHTML">
+            <div class="loading">Loading session info...</div>
+        </div>
+
+        <div class="terminal-output" id="terminalOutput">
+            Waiting for terminal activity...
+        </div>
+
+        <!-- Command Preview Window -->
+        <div class="command-preview-section">
+            <h3>👁️ Command Preview</h3>
+            <div class="command-preview"
+                 hx-get="/api/shellguard/engine/pending-preview"
+                 hx-trigger="load, every 3s"
+                 hx-target="this"
+                 hx-swap="innerHTML">
+                <div class="preview-placeholder">No pending commands</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Approval Queue -->
+    <div class="panel">
+        <div class="queue-header">
+            <h2>⏳ Pending Approvals</h2>
+            <span id="queueCount" class="status-indicator status-pending">0</span>
+            <button class="refresh-btn" onclick="refreshAll()">🔄 Refresh</button>
+        </div>
+        <div class="approval-queue"
+             hx-get="/api/shellguard/engine/pending-approval-view"
+             hx-trigger="load, every 3s"
+             hx-target="this"
+             hx-swap="innerHTML">
+            <div class="loading">Loading approval queue...</div>
+        </div>
+
+        <!-- Command History -->
+        <div class="history-section">
+            <h3>📋 Recent Command History</h3>
+            <div id="commandHistory"
+                 hx-get="/api/shellguard/engine/command-history"
+                 hx-trigger="load, every 5s"
+                 hx-target="this"
+                 hx-swap="innerHTML">
+                <div class="loading">Loading history...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let ws = null;
+    let isConnected = false;
+    let currentPartialLine = null;
+    let partialLineElement = null;
+
+    // WebSocket for real-time terminal output
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/terminal`;
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() {
+            isConnected = true;
+            updateConnectionStatus();
+            console.log('WebSocket connected for terminal output');
+
+            // ✅ ADD: Auto-connect to default session to receive output
+            setTimeout(() => {
+                console.log('🔗 Auto-connecting to default session for output...');
+                connectToSession('default');
+            }, 1000);
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const response = JSON.parse(event.data);
+                console.log('📨 Dashboard received:', response.type, response);
+
+                if (response.type === 'terminal_output') {
+                    console.log('✅ Got terminal output:', response.output);
+                    addTerminalOutput(response.output);
+                } else if (response.type === 'terminal_partial') {
+                    console.log('⏳ Got partial output:', response.output);
+                    addPartialOutput(response.output);
+                } else if (response.type === 'session_connected') {
+                    console.log('✅ Connected to SSH session for output:', response.sessionId);
+                } else if (response.type === 'error' && response.message.includes('Session not found')) {
+                    console.log('⚠️ Session not found - will retry when session exists');
+                    setTimeout(() => connectToSession('default'), 5000);
+                }
+            } catch (e) {
+                console.error('Invalid WebSocket message:', e);
+            }
+        };
+
+        ws.onclose = function() {
+            isConnected = false;
+            updateConnectionStatus();
+            // Attempt to reconnect after 3 seconds
+            setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = function(error) {
+            console.error('WebSocket error:', error);
+        };
+    }
+
+    function updateConnectionStatus() {
+        const status = document.getElementById('connectionStatus');
+        if (isConnected) {
+            status.textContent = '🟢 Connected';
+            status.className = 'connection-status connected';
+        } else {
+            status.textContent = '🔴 Disconnected';
+            status.className = 'connection-status disconnected';
+        }
+    }
+
+    function addTerminalOutput(output) {
+        const terminal = document.getElementById('terminalOutput');
+        if (terminal.textContent === 'Waiting for terminal activity...') {
+            terminal.textContent = '';
+        }
+
+        // Clear any partial line when we get a complete line
+        clearPartialLine();
+
+        terminal.textContent += output + '\n';
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    // ADD this new function for partials:
+    function addPartialOutput(output) {
+        const terminal = document.getElementById('terminalOutput');
+
+        if (terminal.textContent === 'Waiting for terminal activity...') {
+            terminal.textContent = '';
+        }
+
+        if (!partialLineElement) {
+            partialLineElement = document.createElement('div');
+            partialLineElement.style.opacity = '0.7';
+            partialLineElement.style.borderLeft = '2px solid #4facfe';
+            partialLineElement.style.paddingLeft = '5px';
+            partialLineElement.style.color = '#4facfe';
+            terminal.appendChild(partialLineElement);
+        }
+        partialLineElement.textContent = output;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function clearPartialLine() {
+        if (partialLineElement) {
+            partialLineElement.remove();
+            partialLineElement = null;
+        }
+    }
+
+    function refreshSessionInfo() {
+        // Force refresh session info
+        htmx.trigger('.session-info-container', 'refresh');
+
+        // Reconnect WebSocket to current session
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            connectToSession('default'); // or current session ID
+        }
+    }
+
+    // Approval actions
+    function approveCommand(actionId) {
+        fetch(`/api/shellguard/engine/approve/${actionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `approvedBy=${encodeURIComponent('Human Reviewer')}`
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Command approved:', actionId);
+                    // HTMX will automatically refresh the queue
+                    refreshApprovalQueue();
+                } else {
+                    console.error('Approval failed:', data);
+                    alert('Failed to approve command: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Approval failed:', error);
+                alert('Failed to approve command: ' + error.message);
+            });
+    }
+
+    function rejectCommand(actionId, reason = 'Rejected by human reviewer') {
+        const userReason = prompt('Reason for rejection (optional):', reason);
+        if (userReason === null) return; // User cancelled
+
+        fetch(`/api/shellguard/engine/reject/${actionId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `rejectedBy=${encodeURIComponent('Human Reviewer')}&reason=${encodeURIComponent(userReason)}`
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Command rejected:', actionId);
+                    refreshApprovalQueue();
+                } else {
+                    console.error('Rejection failed:', data);
+                    alert('Failed to reject command: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Rejection failed:', error);
+                alert('Failed to reject command: ' + error.message);
+            });
+    }
+
+    function refreshApprovalQueue() {
+        htmx.trigger('.approval-queue', 'refresh');
+        updatePendingCount();
+    }
+
+    function refreshHistory() {
+        htmx.trigger('#commandHistory', 'refresh');
+    }
+
+    function refreshAll() {
+        refreshApprovalQueue();
+        refreshHistory();
+    }
+
+    function updatePendingCount() {
+        fetch('/api/shellguard/engine/pending-count')
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.getElementById('queueCount');
+                badge.textContent = data.count;
+                badge.className = data.count > 0 ? 'status-indicator status-pending' : 'status-indicator status-approved';
+            })
+            .catch(error => console.error('Failed to update count:', error));
+    }
+
+    // Initialize
+    window.addEventListener('load', function() {
+        connectWebSocket();
+        updateConnectionStatus();
+        updatePendingCount();
+
+        // Update count every 10 seconds
+        setInterval(updatePendingCount, 10000);
+    });
+
+    // Make functions available globally for onclick handlers
+    window.approveCommand = approveCommand;
+    window.rejectCommand = rejectCommand;
+    window.refreshAll = refreshAll;
+
+    // Add HTMX event listeners
+    document.addEventListener('htmx:afterRequest', function(event) {
+        if (event.detail.xhr.status !== 200) {
+            console.error('HTMX request failed:', event.detail.xhr.responseText);
+        }
+    });
+
+    // Function to connect to SSH session for output
+    function connectToSession(sessionId) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            const message = {
+                action: 'connect_session',
+                sessionId: sessionId
+            };
+            console.log('🔗 Connecting dashboard to SSH session:', sessionId);
+            ws.send(JSON.stringify(message));
+        } else {
+            console.error('❌ WebSocket not ready for session connection');
+        }
+    }
+</script>
+</body>
+</html>
